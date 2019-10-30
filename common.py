@@ -1,6 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from sklearn.datasets import make_circles
+
+attack_config = {'max_distance': 0.5, 'num_steps': 10, 
+                 'step_size': 0.05, 'random_start': True,
+                 'norm': 'Linf', 'optimizer': 'adam',
+                 'x_min': 0.0, 'x_max': 1.0}
 
 class PGDAttack:
     """Base class for various attack methods"""
@@ -229,24 +235,46 @@ class Model(object):
 
 
 def plot_detector(detector, x, y, ax, sess):
-    grid_x, grid_y = np.meshgrid(np.arange(0, 1.01, 0.001),
-                                 np.arange(0, 1.01, 0.001))
+    grid_x, grid_y = np.meshgrid(np.arange(0, 1.0, 0.001),
+                                 np.arange(0, 1.0, 0.001))
 
     grid_z = sess.run(
         tf.sigmoid(detector.logits),
         feed_dict={detector.x_input:
                    np.c_[grid_x.ravel(), grid_y.ravel()]})
-    print(grid_z.max(), grid_z.min())
     grid_z = grid_z.reshape(grid_x.shape)
     img = np.zeros([*grid_z.shape, 3])
     img[:, :, 0] = 1-grid_z
     img[:, :, 1] = grid_z
     img[:, :, 2] = 0.0
-    plt.imshow(grid_z, extent=(0, 1, 0, 1), origin="lower", alpha=1.0, cmap='inferno')
+    ax.imshow(grid_z, extent=(0, 1, 0, 1), origin="lower", alpha=1.0, cmap='inferno')
+
     if x is not None and y is not None:
         x0, x1 = x[y == 0], x[y == 1]
-        ax.scatter(x0[:, 0], x0[:, 1], color='red', marker='o', s=1)
-        ax.scatter(x1[:, 0], x1[:, 1], color='blue', marker='o', s=1)
+        ax.scatter(x0[:, 0], x0[:, 1], color='red', marker='.', s=1)
+        ax.scatter(x1[:, 0], x1[:, 1], color='blue', marker='.', s=1)
+#         ax.scatter(x0[:, 0], x0[:, 1], color='red', marker='.', s=0.3, facecolors='red')
+#         ax.scatter(x1[:, 0], x1[:, 1], color='blue', marker='.', s=0.3, facecolors='blue')
 
+    ax.set_axis_off()
     ax.set_xlim([0, 1])
     ax.set_ylim([0, 1])
+
+    
+def make_dataset(shape_fn, n_pos_samples, n_neg_samples):
+    np.random.seed(123)
+    # Make two circles
+    x, y = make_circles(n_samples=n_pos_samples*2, factor=.1, noise=.1)
+    x = (x - x.min())/(x - x.min()).max()
+    # Replace the inner circle with the grid
+    x[y==1] = shape_fn((y==1).sum())
+    
+    x0, y0 = x[y==0], y[y==0]
+    x1, y1 = x[y==1], y[y==1]
+    
+    x = np.concatenate([x0[:n_neg_samples], x1])
+    y = np.concatenate([y0[:n_neg_samples], y1])
+    index = np.random.permutation(x.shape[0])
+    x, y = x[index], y[index]
+    
+    return x, y
