@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from sklearn.datasets import make_circles
 
-attack_config = {'max_distance': 0.5, 'num_steps': 10, 
+attack_config = {'max_distance': 0.3, 'num_steps': 10, 
                  'step_size': 0.05, 'random_start': True,
                  'norm': 'Linf', 'optimizer': 'adam',
                  'x_min': 0.0, 'x_max': 1.0}
@@ -11,7 +11,7 @@ attack_config = {'max_distance': 0.5, 'num_steps': 10,
 class PGDAttack:
     """Base class for various attack methods"""
     def __init__(self, max_distance, num_steps, step_size, random_start, x_min,
-                 x_max, batch_size, norm, optimizer):
+                 x_max, batch_size, norm, optimizer, input_size=2):
         self.max_distance = max_distance
         self.num_steps = num_steps
         self.step_size = step_size
@@ -22,7 +22,6 @@ class PGDAttack:
         self.optimizer = optimizer
         self.batch_size = batch_size
 
-        input_size = 2
         self.delta = tf.Variable(np.zeros((batch_size, input_size)),
                                  dtype=tf.float32,
                                  name='delta')
@@ -209,13 +208,13 @@ class TwoClassMLP:
 
 
 class Model(object):
-    def __init__(self, var_scope, hidden_sizes=[200, 200, 200, 200, 200]):
+    def __init__(self, var_scope, hidden_sizes=[200, 200, 200, 200, 200], input_size=2):
         self.output_size = 1
         self.var_scope = var_scope
 
         self.y_input = tf.placeholder(tf.int64, shape=[None])
 
-        self.input_size = 2
+        self.input_size = input_size
         self.x_input = tf.placeholder(tf.float32,
                                       shape=[None, self.input_size])
         self.net = TwoClassMLP(hidden_layer_sizes=hidden_sizes,
@@ -263,16 +262,26 @@ def plot_detector(detector, x, y, ax, sess):
     
 def make_dataset(shape_fn, n_pos_samples, n_neg_samples):
     np.random.seed(123)
-    # Make two circles
-    x, y = make_circles(n_samples=n_pos_samples*2, factor=.1, noise=.1)
-    x = (x - x.min())/(x - x.min()).max()
-    # Replace the inner circle with the grid
-    x[y==1] = shape_fn((y==1).sum())
+#     # Make two circles
+#     x, y = make_circles(n_samples=n_pos_samples*2, factor=.1, noise=.1)
+#     x = (x - x.min())/(x - x.min()).max()
+#     x[y==0] = np.random.rand((y==0).sum(), 2)
+#     # Replace the inner circle with the grid
+#     x[y==1] = shape_fn((y==1).sum())
     
-    x0, y0 = x[y==0], y[y==0]
-    x1, y1 = x[y==1], y[y==1]
+#     x0, y0 = x[y==0], y[y==0]
+#     x1, y1 = x[y==1], y[y==1]
     
-    x = np.concatenate([x0[:n_neg_samples], x1])
+    x0 = np.random.rand(n_neg_samples*10, 2)
+    y0 = np.zeros(x0.shape[0], dtype=np.int64)
+    x1 = shape_fn(n_pos_samples)
+    y1 = np.ones(x1.shape[0], dtype=np.int64)
+    x1_xmin, x1_ymin = np.min(x1, axis=0)
+    x1_xmax, x1_ymax = np.max(x1, axis=0)
+    xmask = np.logical_and(x0[:,0]>x1_xmin-0.05, x0[:,0]<x1_xmax+0.05)
+    ymask = np.logical_and(x0[:,1]>x1_ymin-0.05, x0[:,1]<x1_ymax+0.05)
+    mask = np.logical_not(np.logical_and(xmask, ymask))
+    x = np.concatenate([x0[mask][:n_neg_samples], x1])
     y = np.concatenate([y0[:n_neg_samples], y1])
     index = np.random.permutation(x.shape[0])
     x, y = x[index], y[index]
