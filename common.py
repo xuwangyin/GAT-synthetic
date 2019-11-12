@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from sklearn.datasets import make_circles
 
-attack_config = {'max_distance': 0.3, 'num_steps': 10, 
+attack_config = {'max_distance': 0.5, 'num_steps': 10, 
                  'step_size': 0.05, 'random_start': True,
                  'norm': 'Linf', 'optimizer': 'adam',
                  'x_min': 0.0, 'x_max': 1.0}
