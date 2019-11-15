@@ -233,29 +233,32 @@ class Model(object):
         return self.net.forward(x)
 
 
-def plot_detector(detector, x, y, ax, sess):
+def plot_detector(detector, x, y, ax, sess, plot_z=True):
     grid_x, grid_y = np.meshgrid(np.arange(0, 1.0, 0.001),
                                  np.arange(0, 1.0, 0.001))
+    if plot_z:
+        grid_z = sess.run(
+            tf.sigmoid(detector.logits),
+            feed_dict={detector.x_input:
+                       np.c_[grid_x.ravel(), grid_y.ravel()]})
+        grid_z = grid_z.reshape(grid_x.shape)
+        img = np.zeros([*grid_z.shape, 3])
+        img[:, :, 0] = 1-grid_z
+        img[:, :, 1] = grid_z
+        img[:, :, 2] = 0.0
+        ax.imshow(grid_z, extent=(0, 1, 0, 1), origin="lower", alpha=1.0, cmap='inferno')
 
-    grid_z = sess.run(
-        tf.sigmoid(detector.logits),
-        feed_dict={detector.x_input:
-                   np.c_[grid_x.ravel(), grid_y.ravel()]})
-    grid_z = grid_z.reshape(grid_x.shape)
-    img = np.zeros([*grid_z.shape, 3])
-    img[:, :, 0] = 1-grid_z
-    img[:, :, 1] = grid_z
-    img[:, :, 2] = 0.0
-    ax.imshow(grid_z, extent=(0, 1, 0, 1), origin="lower", alpha=1.0, cmap='inferno')
 
     if x is not None and y is not None:
         x0, x1 = x[y == 0], x[y == 1]
         ax.scatter(x0[:, 0], x0[:, 1], color='red', marker='.', s=1)
         ax.scatter(x1[:, 0], x1[:, 1], color='blue', marker='.', s=1)
+#         ax.axis('equal')
+        ax.set_aspect('equal', 'box')
 #         ax.scatter(x0[:, 0], x0[:, 1], color='red', marker='.', s=0.3, facecolors='red')
 #         ax.scatter(x1[:, 0], x1[:, 1], color='blue', marker='.', s=0.3, facecolors='blue')
 
-    ax.set_axis_off()
+#     ax.set_axis_off()
     ax.set_xlim([0, 1])
     ax.set_ylim([0, 1])
 
